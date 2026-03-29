@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="theme-color" content="#0c0b09"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<title>Trade Diligence</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0c0b09;font-family:'Instrument Sans',sans-serif;color:#e8e0d0}
+input,select,textarea,button{font-family:'Instrument Sans',sans-serif}
+input:focus,select:focus,textarea:focus{outline:none;border-color:rgba(168,134,62,0.6)!important;box-shadow:0 0 0 2px rgba(168,134,62,0.1)}
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-thumb{background:rgba(168,134,62,0.2);border-radius:3px}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+// ── Theme ──
+const T = {
+  bg:'#0c0b09', sf:'#141310', sf2:'#1a1916',
+  bd:'rgba(168,134,62,0.12)', g:'#a8863e', gd:'rgba(168,134,62,0.3)',
+  tx:'#e8e0d0', td:'#8a8272', fn:"'Instrument Sans',sans-serif", mn:"'IBM Plex Mono',monospace"
+};
+const RC = { green:'#22c55e', yellow:'#eab308', red:'#ef4444' };
+
+// ── Red Flags ──
+const FLAGS = [
+  {id:'rf1',label:'Buyer refuses to provide proof of funds',sev:'high',cat:'financial'},
+  {id:'rf2',label:'Company registered less than 6 months ago',sev:'medium',cat:'corporate'},
+  {id:'rf3',label:'Intermediary chain exceeds 3 parties',sev:'high',cat:'structure'},
+  {id:'rf4',label:'BCL from unknown or unrated bank',sev:'high',cat:'financial'},
+  {id:'rf5',label:'ICPO has grammatical errors or inconsistencies',sev:'medium',cat:'docs'},
+  {id:'rf6',label:'Buyer requests upfront fees or commissions',sev:'high',cat:'fraud'},
+  {id:'rf7',label:'No verifiable past transaction history',sev:'medium',cat:'history'},
+  {id:'rf8',label:'Company address is virtual office / PO box',sev:'medium',cat:'corporate'},
+  {id:'rf9',label:"Director names don't match registration docs",sev:'high',cat:'corporate'},
+  {id:'rf10',label:'Price significantly below market rate',sev:'high',cat:'fraud'},
+  {id:'rf11',label:"Vessel IMO number doesn't match records",sev:'high',cat:'vessel'},
+  {id:'rf12',label:'Vessel flagged in sanctioned country',sev:'high',cat:'sanctions'},
+  {id:'rf13',label:'SGS/inspection report not verifiable',sev:'high',cat:'docs'},
+  {id:'rf14',label:'LOI missing key commercial terms',sev:'medium',cat:'docs'},
+  {id:'rf15',label:'Buyer insists on non-standard payment terms',sev:'medium',cat:'financial'},
+  {id:'rf16',label:'Rushed timeline / pressure to close quickly',sev:'medium',cat:'fraud'},
+  {id:'rf17',label:'Country on FATF grey/black list',sev:'high',cat:'sanctions'},
+  {id:'rf18',label:'Beneficial ownership is obscured',sev:'high',cat:'corporate'},
+  {id:'rf19',label:'Past sanctions violations on record',sev:'high',cat:'sanctions'},
+  {id:'rf20',label:'Vessel has history of AIS gaps (dark activity)',sev:'high',cat:'vessel'},
+  {id:'rf21',label:'Mismatched product specifications',sev:'medium',cat:'docs'},
+  {id:'rf22',label:'Title transfer documents incomplete',sev:'high',cat:'docs'},
+  {id:'rf23',label:'POP/POL cannot be independently verified',sev:'high',cat:'fraud'},
+  {id:'rf24',label:'Multiple broker layers with unclear roles',sev:'medium',cat:'structure'},
+];
+
+// ── Verification Checks ──
+const CHECKS = [
+  {id:'vc1',label:'Company registration verified',for:['buyer','seller'],cat:'entity'},
+  {id:'vc2',label:'Director / UBO identity confirmed',for:['buyer','seller'],cat:'entity'},
+  {id:'vc3',label:'Bank reference letter received',for:['buyer'],cat:'financial'},
+  {id:'vc4',label:'Proof of funds / BCL verified with bank',for:['buyer'],cat:'financial'},
+  {id:'vc5',label:'Past transaction references checked',for:['buyer','seller'],cat:'history'},
+  {id:'vc6',label:'OFAC/SDN screening clear',for:['buyer','seller','vessel'],cat:'compliance'},
+  {id:'vc7',label:'EU sanctions screening clear',for:['buyer','seller','vessel'],cat:'compliance'},
+  {id:'vc8',label:'UN sanctions screening clear',for:['buyer','seller','vessel'],cat:'compliance'},
+  {id:'vc9',label:'OFSI screening clear',for:['buyer','seller'],cat:'compliance'},
+  {id:'vc10',label:'PEP screening complete',for:['buyer','seller'],cat:'compliance'},
+  {id:'vc11',label:'KYC documents collected',for:['buyer','seller'],cat:'compliance'},
+  {id:'vc12',label:'AML check passed',for:['buyer','seller'],cat:'compliance'},
+  {id:'vc13',label:'LOI/ICPO terms verified',for:['buyer'],cat:'docs'},
+  {id:'vc14',label:'SGS/inspection report verified',for:['seller'],cat:'docs'},
+  {id:'vc15',label:'Vessel IMO verified with maritime registry',for:['vessel'],cat:'vessel'},
+  {id:'vc16',label:'Vessel ownership chain confirmed',for:['vessel'],cat:'vessel'},
+  {id:'vc17',label:'Vessel flag state acceptable',for:['vessel'],cat:'vessel'},
+  {id:'vc18',label:'Vessel class society verified',for:['vessel'],cat:'vessel'},
+  {id:'vc19',label:'Product spec matches contract',for:['seller'],cat:'product'},
+  {id:'vc20',label:'Origin/loading port confirmed',for:['seller'],cat:'product'},
+  {id:'vc21',label:'Insurance coverage verified',for:['buyer','seller','vessel'],cat:'financial'},
+  {id:'vc22',label:'LC terms acceptable',for:['buyer'],cat:'financial'},
+  {id:'vc23',label:'Title transfer chain complete',for:['seller'],cat:'docs'},
+];
+
+const ETYPES = [{v:'buyer',l:'Buyer'},{v:'seller',l:'Seller'},{v:'vessel',l:'Vessel'},{v:'broker',l:'Broker / Intermediary'}];
+const COMMODITIES = ['EN590 Diesel','D2 Diesel','D6 Fuel Oil','Jet A1','BLCO','Bonny Light','Gold (AU)','Gold Dore','Copper Cathode','Iron Ore','LNG','LPG','Bitumen','Mazut M100','Urea','Sugar ICUMSA 45','Rice','Cement'];
+const DOCTYPES = ['LOI','ICPO','BCL','Proof of Funds','SGS Report','Certificate of Origin','Bill of Lading','Commercial Invoice','Packing List','Insurance Certificate','Title Transfer','Tank Receipt','Q&Q Report','DTA/RWA','POP','Company Registration'];
+
+// ── Scoring ──
+function calcScore(e) {
+  const ch = CHECKS.filter(c => c.for.includes(e.type));
+  const passed = ch.filter(c => e.verifications?.[c.id]?.status === 'pass').length;
+  const fc = (e.flags||[]).length;
+  const hf = (e.flags||[]).filter(f => { const r = FLAGS.find(x => x.id===f); return r?.sev==='high'; }).length;
+  const cs = ch.length > 0 ? (passed/ch.length)*60 : 30;
+  const fp = Math.min(40, hf*15 + (fc-hf)*5);
+  return Math.max(0, Math.min(100, Math.round(cs + 40 - fp)));
+}
+function getRating(s) { return s >= 70 ? 'green' : s >= 40 ? 'yellow' : 'red'; }
+
+// ── AI Service ──
+const GKEY = ''; // Set your Gemini API key here or leave blank
+const GURL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+const hasKey = () => !!GKEY;
+
+async function aiChat(prompt, sys='') {
+  if (!GKEY) return {error:true,text:'No API key. Set GKEY in the HTML file.'};
+  try {
+    const contents = [];
+    if (sys) { contents.push({role:'user',parts:[{text:sys}]}); contents.push({role:'model',parts:[{text:'Understood.'}]}); }
+    contents.push({role:'user',parts:[{text:prompt}]});
+    const res = await fetch(`${GURL}?key=${GKEY}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents,generationConfig:{temperature:0.3,maxOutputTokens:2048}})});
+    const data = await res.json();
+    if (data.error) return {error:true,text:data.error.message};
+    return {error:false,text:data.candidates?.[0]?.content?.parts?.[0]?.text||'No response'};
+  } catch(err) { return {error:true,text:err.message}; }
+}
+
+async function scanDoc(text,type) {
+  const sys = 'You are a commodity trade compliance analyst. Analyze documents for red flags and fraud. Respond in JSON: score(0-100), rating("green"|"yellow"|"red"), flags(array), summary(string), details(string).';
+  const r = await aiChat(`Analyze this ${type} document:\n\n${text}`, sys);
+  if (r.error) return {score:0,rating:'red',flags:['AI unavailable'],summary:r.text,details:''};
+  try { return JSON.parse(r.text.replace(/```json|```/g,'').trim()); } catch { return {score:50,rating:'yellow',flags:['Parse error'],summary:r.text,details:''}; }
+}
+
+async function screenSanctions(name,type,country) {
+  const sys = 'You are a sanctions screening tool. Check against OFAC SDN, EU, UN, OFSI. Respond in JSON: status("clear"|"potential_match"|"match"), matches(array), recommendation(string).';
+  const r = await aiChat(`Screen: ${name}, Type: ${type}, Country: ${country}`, sys);
+  if (r.error) return {status:'clear',matches:[],recommendation:r.text};
+  try { return JSON.parse(r.text.replace(/```json|```/g,'').trim()); } catch { return {status:'clear',matches:[],recommendation:r.text}; }
+}
+
+async function verifyEnt(name,type,details) {
+  const sys = 'You are a due diligence analyst. Verify entities and assess risk. Respond in JSON: riskScore(0-100), riskLevel("low"|"medium"|"high"), findings(array), recommendation(string).';
+  const r = await aiChat(`Verify ${type}: ${name}, Details: ${JSON.stringify(details)}`, sys);
+  if (r.error) return {riskScore:50,riskLevel:'medium',findings:['AI unavailable'],recommendation:r.text};
+  try { return JSON.parse(r.text.replace(/```json|```/g,'').trim()); } catch { return {riskScore:50,riskLevel:'medium',findings:['Parse error'],recommendation:r.text}; }
+}
+
+// ── Styles ──
+const s = {
+  hd:{padding:'16px 20px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:`1px solid ${T.bd}`,background:T.sf},
+  logo:{fontSize:18,fontWeight:700,color:T.g,letterSpacing:'-0.02em'},
+  main:{maxWidth:960,margin:'0 auto',padding:'20px 16px'},
+  card:{background:T.sf,border:`1px solid ${T.bd}`,borderRadius:10,padding:20,marginBottom:16},
+  inp:{width:'100%',padding:'10px 12px',background:T.sf2,border:`1px solid ${T.bd}`,borderRadius:8,color:T.tx,fontSize:13},
+  sel:{width:'100%',padding:'10px 12px',background:T.sf2,border:`1px solid ${T.bd}`,borderRadius:8,color:T.tx,fontSize:13,cursor:'pointer'},
+  ta:{width:'100%',padding:'10px 12px',background:T.sf2,border:`1px solid ${T.bd}`,borderRadius:8,color:T.tx,fontSize:13,minHeight:80,resize:'vertical'},
+  lbl:{fontSize:11,fontWeight:600,color:T.td,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:6,display:'block'},
+  btn:{padding:'10px 18px',borderRadius:8,border:'none',fontWeight:600,fontSize:13,cursor:'pointer',transition:'all 0.15s'},
+  bp:{background:T.g,color:'#0c0b09'},
+  bs:{background:'transparent',border:`1px solid ${T.bd}`,color:T.tx},
+  bd:{background:'rgba(239,68,68,0.15)',color:'#ef4444',border:'1px solid rgba(239,68,68,0.2)'},
+  sm:{padding:'6px 12px',fontSize:12},
+  badge:{display:'inline-block',padding:'3px 10px',borderRadius:20,fontSize:11,fontWeight:600},
+  row:{display:'flex',gap:12,alignItems:'center'},
+  g2:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12},
+  mut:{color:T.td,fontSize:12},
+  mono:{fontFamily:T.mn,fontSize:12},
+};
+
+// ── Components ──
+function Badge({color,children}) {
+  return <span style={{...s.badge,background:`${color}22`,color,border:`1px solid ${color}44`}}>{children}</span>;
+}
+function ScoreCircle({score}) {
+  const c = RC[getRating(score)];
+  return <div style={{width:48,height:48,borderRadius:'50%',border:`3px solid ${c}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,fontWeight:700,fontFamily:T.mn,color:c}}>{score}</div>;
+}
+function Spinner() {
+  return <span style={{display:'inline-block',width:14,height:14,border:`2px solid ${T.gd}`,borderTopColor:T.g,borderRadius:'50%',animation:'spin 0.8s linear infinite'}}/>;
+}
+function Empty({icon,title,sub}) {
+  return <div style={{textAlign:'center',padding:'48px 20px',color:T.td}}>
+    <div style={{fontSize:36,marginBottom:12,opacity:0.4}}>{icon}</div>
+    <div style={{fontSize:15,fontWeight:600,color:T.tx,marginBottom:6}}>{title}</div>
+    <div style={{fontSize:13}}>{sub}</div>
+  </div>;
+}
+function Tab({active,children,onClick}) {
+  return <button style={{padding:'8px 16px',fontSize:12,fontWeight:active?600:400,color:active?T.g:T.td,background:active?'rgba(168,134,62,0.1)':'transparent',border:`1px solid ${active?T.gd:'transparent'}`,borderRadius:6,cursor:'pointer'}} onClick={onClick}>{children}</button>;
+}
+
+// ── Add Modal ──
+function AddModal({onAdd,onClose}) {
+  const [f,sf] = useState({name:'',type:'buyer',commodity:'EN590 Diesel',country:'',notes:''});
+  const set = (k,v) => sf(p=>({...p,[k]:v}));
+  return <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:999,padding:16}} onClick={onClose}>
+    <div style={{...s.card,maxWidth:440,width:'100%',animation:'fadeUp 0.2s ease-out'}} onClick={e=>e.stopPropagation()}>
+      <h3 style={{fontSize:16,fontWeight:600,marginBottom:20}}>Add Entity</h3>
+      <div style={{marginBottom:12}}><label style={s.lbl}>Entity Name *</label><input style={s.inp} value={f.name} onChange={e=>set('name',e.target.value)} placeholder="Company or vessel name"/></div>
+      <div style={{...s.g2,marginBottom:12}}>
+        <div><label style={s.lbl}>Type</label><select style={s.sel} value={f.type} onChange={e=>set('type',e.target.value)}>{ETYPES.map(t=><option key={t.v} value={t.v}>{t.l}</option>)}</select></div>
+        <div><label style={s.lbl}>Commodity</label><select style={s.sel} value={f.commodity} onChange={e=>set('commodity',e.target.value)}>{COMMODITIES.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
+      </div>
+      <div style={{marginBottom:12}}><label style={s.lbl}>Country</label><input style={s.inp} value={f.country} onChange={e=>set('country',e.target.value)} placeholder="Country of registration"/></div>
+      <div style={{marginBottom:20}}><label style={s.lbl}>Notes</label><textarea style={s.ta} value={f.notes} onChange={e=>set('notes',e.target.value)} placeholder="Optional notes..."/></div>
+      <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
+        <button style={{...s.btn,...s.bs}} onClick={onClose}>Cancel</button>
+        <button style={{...s.btn,...s.bp,opacity:f.name?1:0.4}} disabled={!f.name} onClick={()=>{if(f.name){onAdd({...f,id:Date.now().toString(),flags:[],verifications:{},docs:[],sanctionsResults:[],createdAt:new Date().toISOString()});onClose();}}}>Add Entity</button>
+      </div>
+    </div>
+  </div>;
+}
+
+// ── Entity Detail ──
+function Detail({entity,onUpdate,onBack}) {
+  const [tab,setTab] = useState('overview');
+  const [aiL,setAiL] = useState(null);
+  const [aiR,setAiR] = useState(null);
+  const [dTxt,setDTxt] = useState('');
+  const [dType,setDType] = useState('LOI');
+  const score = calcScore(entity);
+  const rating = getRating(score);
+  const checks = CHECKS.filter(c=>c.for.includes(entity.type));
+  const eFlags = FLAGS.filter(r=>(entity.flags||[]).includes(r.id));
+
+  const togFlag = id => { const fl = entity.flags||[]; onUpdate({...entity,flags:fl.includes(id)?fl.filter(f=>f!==id):[...fl,id]}); };
+  const togCheck = id => { const v={...entity.verifications}; v[id] = v[id]?.status==='pass'?{status:'pending'}:{status:'pass',date:new Date().toISOString()}; onUpdate({...entity,verifications:v}); };
+
+  const doSanctions = async () => { setAiL('s'); const r = await screenSanctions(entity.name,entity.type,entity.country); onUpdate({...entity,sanctionsResults:[...(entity.sanctionsResults||[]),{...r,date:new Date().toISOString(),list:'Combined'}]}); setAiR({t:'s',d:r}); setAiL(null); };
+  const doDocScan = async () => { if(!dTxt.trim())return; setAiL('d'); const r = await scanDoc(dTxt,dType); onUpdate({...entity,docs:[...(entity.docs||[]),{type:dType,scanResult:r,date:new Date().toISOString(),text:dTxt.slice(0,200)}]}); setAiR({t:'d',d:r}); setAiL(null); setDTxt(''); };
+  const doVerify = async () => { setAiL('v'); const r = await verifyEnt(entity.name,entity.type,{country:entity.country,commodity:entity.commodity}); setAiR({t:'v',d:r}); setAiL(null); };
+
+  return <div>
+    <button style={{...s.btn,...s.bs,...s.sm,marginBottom:16}} onClick={onBack}>← Back</button>
+    <div style={s.card}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+        <div>
+          <div style={{fontSize:20,fontWeight:700,marginBottom:4}}>{entity.name}</div>
+          <div style={s.row}>
+            <Badge color={T.g}>{ETYPES.find(t=>t.v===entity.type)?.l}</Badge>
+            <Badge color={RC[rating]}>{rating.toUpperCase()}</Badge>
+            {entity.commodity && <span style={s.mut}>{entity.commodity}</span>}
+            {entity.country && <span style={s.mut}>· {entity.country}</span>}
+          </div>
+        </div>
+        <ScoreCircle score={score}/>
+      </div>
+    </div>
+
+    <div style={{display:'flex',gap:6,marginBottom:16,flexWrap:'wrap'}}>
+      {['overview','checks','flags','docs','sanctions','ai'].map(t=><Tab key={t} active={tab===t} onClick={()=>setTab(t)}>{t.charAt(0).toUpperCase()+t.slice(1)}</Tab>)}
+    </div>
+
+    {tab==='overview' && <div style={s.card}>
+      <div style={s.g2}>
+        <div><span style={s.mut}>Checks passed</span><div style={{fontSize:20,fontWeight:700,marginTop:4}}>{checks.filter(c=>entity.verifications?.[c.id]?.status==='pass').length} / {checks.length}</div></div>
+        <div><span style={s.mut}>Red flags</span><div style={{fontSize:20,fontWeight:700,marginTop:4,color:eFlags.length>0?'#ef4444':'#22c55e'}}>{eFlags.length}</div></div>
+        <div><span style={s.mut}>Documents scanned</span><div style={{fontSize:20,fontWeight:700,marginTop:4}}>{(entity.docs||[]).length}</div></div>
+        <div><span style={s.mut}>Sanctions screens</span><div style={{fontSize:20,fontWeight:700,marginTop:4}}>{(entity.sanctionsResults||[]).length}</div></div>
+      </div>
+      {entity.notes && <div style={{marginTop:16,padding:12,background:T.sf2,borderRadius:8,fontSize:13,color:T.td}}>{entity.notes}</div>}
+    </div>}
+
+    {tab==='checks' && <div style={s.card}>
+      {checks.map(c => {
+        const st = entity.verifications?.[c.id]?.status||'pending';
+        return <div key={c.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 0',borderBottom:'1px solid rgba(255,255,255,0.03)',cursor:'pointer'}} onClick={()=>togCheck(c.id)}>
+          <div style={s.row}><span style={{width:8,height:8,borderRadius:'50%',background:st==='pass'?'#22c55e':'#555',display:'inline-block',marginRight:6}}/><span style={{fontSize:13,color:st==='pass'?T.tx:T.td}}>{c.label}</span></div>
+          <Badge color={st==='pass'?'#22c55e':'#555'}>{st==='pass'?'✓':'○'}</Badge>
+        </div>;
+      })}
+    </div>}
+
+    {tab==='flags' && <div style={s.card}>
+      <div style={{...s.mut,marginBottom:12}}>Tap to toggle red flags for this entity</div>
+      {FLAGS.filter(r=>r.cat!=='vessel'||entity.type==='vessel').map(rf => {
+        const active = (entity.flags||[]).includes(rf.id);
+        return <div key={rf.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 0',borderBottom:'1px solid rgba(255,255,255,0.03)',cursor:'pointer',opacity:active?1:0.5}} onClick={()=>togFlag(rf.id)}>
+          <div style={s.row}><span style={{fontSize:13}}>{active?'🚩':'○'}</span><span style={{fontSize:13}}>{rf.label}</span></div>
+          <Badge color={rf.sev==='high'?'#ef4444':'#eab308'}>{rf.sev}</Badge>
+        </div>;
+      })}
+    </div>}
+
+    {tab==='docs' && <div style={s.card}>
+      <div style={{marginBottom:16}}>
+        <div style={s.g2}>
+          <div><label style={s.lbl}>Document Type</label><select style={s.sel} value={dType} onChange={e=>setDType(e.target.value)}>{DOCTYPES.map(d=><option key={d} value={d}>{d}</option>)}</select></div>
+          <div style={{display:'flex',alignItems:'flex-end'}}><button style={{...s.btn,...s.bp,...s.sm,opacity:dTxt&&!aiL?1:0.4}} onClick={doDocScan} disabled={!dTxt||!!aiL}>{aiL==='d'?<Spinner/>:'🔍 Scan'}</button></div>
+        </div>
+        <textarea style={{...s.ta,marginTop:10}} value={dTxt} onChange={e=>setDTxt(e.target.value)} placeholder="Paste document text here for AI analysis..."/>
+        {!hasKey() && <div style={{...s.mut,marginTop:6,color:'#eab308'}}>⚠ Add your Gemini API key to enable AI scanning</div>}
+      </div>
+      {(entity.docs||[]).length>0 ? (entity.docs||[]).map((d,i)=><div key={i} style={{padding:12,background:T.sf2,borderRadius:8,marginBottom:8}}>
+        <div style={s.row}><Badge color={RC[d.scanResult?.rating||'yellow']}>{d.type}</Badge><span style={s.mut}>{new Date(d.date).toLocaleDateString()}</span>{d.scanResult&&<span style={{...s.mono,color:RC[d.scanResult.rating]}}>Score: {d.scanResult.score}</span>}</div>
+        {d.scanResult?.summary&&<div style={{...s.mut,marginTop:6}}>{d.scanResult.summary}</div>}
+        {d.scanResult?.flags?.length>0&&<div style={{marginTop:6}}>{d.scanResult.flags.map((f,j)=><span key={j} style={{...s.badge,background:'rgba(239,68,68,0.1)',color:'#ef4444',marginRight:4,fontSize:10}}>⚠ {f}</span>)}</div>}
+      </div>) : <Empty icon="📄" title="No documents scanned" sub="Paste document text above to scan"/>}
+    </div>}
+
+    {tab==='sanctions' && <div style={s.card}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+        <span style={{fontSize:14,fontWeight:600}}>Sanctions Screening</span>
+        <button style={{...s.btn,...s.bp,...s.sm}} onClick={doSanctions} disabled={!!aiL}>{aiL==='s'?<Spinner/>:'🔍 Screen Now'}</button>
+      </div>
+      {!hasKey()&&<div style={{...s.mut,marginBottom:12,color:'#eab308'}}>⚠ Add your Gemini API key to enable AI screening</div>}
+      {(entity.sanctionsResults||[]).length>0 ? (entity.sanctionsResults||[]).map((sr,i)=><div key={i} style={{padding:12,background:T.sf2,borderRadius:8,marginBottom:8}}>
+        <div style={s.row}><Badge color={sr.status==='clear'?'#22c55e':sr.status==='match'?'#ef4444':'#eab308'}>{sr.status.toUpperCase()}</Badge><span style={s.mut}>{new Date(sr.date).toLocaleDateString()}</span></div>
+        {sr.recommendation&&<div style={{...s.mut,marginTop:6}}>{sr.recommendation}</div>}
+      </div>) : <Empty icon="🛡️" title="No screenings yet" sub="Click Screen Now to run sanctions check"/>}
+    </div>}
+
+    {tab==='ai' && <div style={s.card}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+        <span style={{fontSize:14,fontWeight:600}}>AI Entity Verification</span>
+        <button style={{...s.btn,...s.bp,...s.sm}} onClick={doVerify} disabled={!!aiL}>{aiL==='v'?<Spinner/>:'🤖 Verify Entity'}</button>
+      </div>
+      {!hasKey()&&<div style={{...s.mut,marginBottom:12,color:'#eab308'}}>⚠ Add your Gemini API key to enable AI verification</div>}
+      {aiR?.t==='v' && <div style={{padding:16,background:T.sf2,borderRadius:8}}>
+        <div style={s.row}><span style={{fontSize:14,fontWeight:600}}>Risk Score:</span><Badge color={RC[aiR.d.riskLevel==='low'?'green':aiR.d.riskLevel==='high'?'red':'yellow']}>{aiR.d.riskScore}/100 — {aiR.d.riskLevel}</Badge></div>
+        {aiR.d.findings?.length>0&&<div style={{marginTop:12}}><span style={s.mut}>Findings:</span>{aiR.d.findings.map((f,i)=><div key={i} style={{fontSize:13,marginTop:4,paddingLeft:12,borderLeft:`2px solid ${T.gd}`}}>{f}</div>)}</div>}
+        {aiR.d.recommendation&&<div style={{...s.mut,marginTop:12,padding:10,background:T.sf,borderRadius:6}}>{aiR.d.recommendation}</div>}
+      </div>}
+      {!aiR&&<Empty icon="🤖" title="AI Verification" sub="Click Verify Entity to run an AI-powered risk assessment"/>}
+    </div>}
+  </div>;
+}
+
+// ── Compare ──
+function Compare({entities}) {
+  const [sel,setSel] = useState([]);
+  const tog = id => setSel(p=>p.includes(id)?p.filter(x=>x!==id):p.length<4?[...p,id]:p);
+  const picked = entities.filter(e=>sel.includes(e.id));
+  return <div>
+    <div style={s.card}>
+      <div style={{...s.mut,marginBottom:12}}>Select up to 4 entities to compare</div>
+      <div style={{display:'flex',flexWrap:'wrap',gap:8}}>{entities.map(e=><button key={e.id} style={{...s.btn,...s.sm,...(sel.includes(e.id)?s.bp:s.bs)}} onClick={()=>tog(e.id)}>{e.name}</button>)}</div>
+    </div>
+    {picked.length>=2 && <div style={{...s.card,overflowX:'auto'}}>
+      <table style={{width:'100%',borderCollapse:'collapse'}}>
+        <thead><tr><th style={{padding:'8px 14px',fontSize:11,fontWeight:600,color:T.td,textTransform:'uppercase',borderBottom:`1px solid ${T.bd}`,textAlign:'left'}}>Metric</th>{picked.map(e=><th key={e.id} style={{padding:'8px 14px',fontSize:11,fontWeight:600,color:T.td,textTransform:'uppercase',borderBottom:`1px solid ${T.bd}`,textAlign:'left'}}>{e.name}</th>)}</tr></thead>
+        <tbody>
+          {[
+            {l:'Score',r:e=>{const sc=calcScore(e);return <span style={{color:RC[getRating(sc)],fontWeight:700,fontFamily:T.mn}}>{sc}</span>;}},
+            {l:'Rating',r:e=>{const rt=getRating(calcScore(e));return <Badge color={RC[rt]}>{rt.toUpperCase()}</Badge>;}},
+            {l:'Type',r:e=>ETYPES.find(t=>t.v===e.type)?.l},
+            {l:'Country',r:e=>e.country||'—'},
+            {l:'Red Flags',r:e=><span style={{color:(e.flags||[]).length>0?'#ef4444':'#22c55e'}}>{(e.flags||[]).length}</span>},
+            {l:'Checks',r:e=>{const c=CHECKS.filter(x=>x.for.includes(e.type));return `${c.filter(x=>e.verifications?.[x.id]?.status==='pass').length}/${c.length}`;}},
+            {l:'Docs',r:e=>(e.docs||[]).length},
+            {l:'Sanctions',r:e=>{const sr=e.sanctionsResults||[];const cl=sr.filter(x=>x.status==='clear').length;return sr.length>0?<span style={{color:cl===sr.length?'#22c55e':'#ef4444'}}>{cl}/{sr.length} clear</span>:'—';}},
+          ].map(row=><tr key={row.l}><td style={{padding:'10px 14px',fontSize:13,borderBottom:'1px solid rgba(255,255,255,0.03)',color:T.td}}>{row.l}</td>{picked.map(e=><td key={e.id} style={{padding:'10px 14px',fontSize:13,borderBottom:'1px solid rgba(255,255,255,0.03)'}}>{row.r(e)}</td>)}</tr>)}
+        </tbody>
+      </table>
+    </div>}
+    {picked.length<2&&<Empty icon="⚖️" title="Select 2+ entities" sub="Pick entities above to compare"/>}
+  </div>;
+}
+
+// ── Main App ──
+function App() {
+  const [ents,setEnts] = useState(()=>{try{return JSON.parse(localStorage.getItem('td_entities')||'[]');}catch{return[];}});
+  const [view,setView] = useState('list');
+  const [active,setActive] = useState(null);
+  const [showAdd,setShowAdd] = useState(false);
+  const [search,setSearch] = useState('');
+
+  useEffect(()=>{localStorage.setItem('td_entities',JSON.stringify(ents));},[ents]);
+
+  const add = e => setEnts(p=>[...p,e]);
+  const upd = u => setEnts(p=>p.map(e=>e.id===u.id?u:e));
+  const del = id => {setEnts(p=>p.filter(e=>e.id!==id));setView('list');setActive(null);};
+  const open = e => {setActive(e);setView('detail');};
+  const filtered = ents.filter(e=>e.name.toLowerCase().includes(search.toLowerCase())||e.type.includes(search.toLowerCase()));
+
+  return <div style={{fontFamily:T.fn,background:T.bg,color:T.tx,minHeight:'100vh'}}>
+    <div style={s.hd}>
+      <div style={{cursor:'pointer'}} onClick={()=>setView('list')}>
+        <div style={s.logo}>◆ TRADE DILIGENCE</div>
+        <div style={{fontSize:10,color:T.td,letterSpacing:'0.1em'}}>COMMODITY VERIFICATION PLATFORM</div>
+      </div>
+      <div style={s.row}>
+        {ents.length>=2&&<button style={{...s.btn,...s.bs,...s.sm}} onClick={()=>setView(view==='compare'?'list':'compare')}>{view==='compare'?'← List':'⚖️ Compare'}</button>}
+        <button style={{...s.btn,...s.bp,...s.sm}} onClick={()=>setShowAdd(true)}>+ Add</button>
+      </div>
+    </div>
+
+    <div style={s.main}>
+      {!hasKey()&&<div style={{...s.card,background:'rgba(234,179,8,0.06)',borderColor:'rgba(234,179,8,0.2)',marginBottom:16}}>
+        <div style={{fontSize:13,color:'#eab308'}}>⚠ <strong>AI features disabled.</strong> To enable document scanning, sanctions screening, and entity verification, add your Gemini API key in the HTML file (search for GKEY).</div>
+      </div>}
+
+      {view==='compare'&&<Compare entities={ents}/>}
+      {view==='detail'&&active&&<Detail entity={ents.find(e=>e.id===active.id)||active} onUpdate={upd} onBack={()=>{setView('list');setActive(null);}}/>}
+      {view==='list'&&<>
+        {ents.length>0&&<div style={{marginBottom:16}}><input style={s.inp} placeholder="Search entities..." value={search} onChange={e=>setSearch(e.target.value)}/></div>}
+        {filtered.length>0?filtered.map(e=>{
+          const sc=calcScore(e);const rt=getRating(sc);
+          const ch=CHECKS.filter(c=>c.for.includes(e.type));
+          const passed=ch.filter(c=>e.verifications?.[c.id]?.status==='pass').length;
+          return <div key={e.id} style={{...s.card,cursor:'pointer',animation:'fadeUp 0.3s ease-out'}} onClick={()=>open(e)}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <div>
+                <div style={{fontSize:15,fontWeight:600,marginBottom:6}}>{e.name}</div>
+                <div style={{...s.row,flexWrap:'wrap'}}>
+                  <Badge color={T.g}>{ETYPES.find(t=>t.v===e.type)?.l}</Badge>
+                  <Badge color={RC[rt]}>{rt.toUpperCase()}</Badge>
+                  {e.commodity&&<span style={s.mut}>{e.commodity}</span>}
+                  {e.country&&<span style={s.mut}>· {e.country}</span>}
+                </div>
+                <div style={{...s.row,marginTop:8}}>
+                  <span style={{...s.mut,fontSize:11}}>✓ {passed}/{ch.length} checks</span>
+                  <span style={{...s.mut,fontSize:11}}>🚩 {(e.flags||[]).length} flags</span>
+                  <span style={{...s.mut,fontSize:11}}>📄 {(e.docs||[]).length} docs</span>
+                </div>
+              </div>
+              <div style={{display:'flex',alignItems:'center',gap:12}}>
+                <ScoreCircle score={sc}/>
+                <button style={{...s.btn,...s.bd,...s.sm,padding:'4px 8px',fontSize:11}} onClick={ev=>{ev.stopPropagation();if(confirm(`Delete ${e.name}?`))del(e.id);}}>✕</button>
+              </div>
+            </div>
+          </div>;
+        }):<Empty icon="◆" title="No entities yet" sub="Add a buyer, seller, or vessel to start vetting"/>}
+      </>}
+    </div>
+    {showAdd&&<AddModal onAdd={add} onClose={()=>setShowAdd(false)}/>}
+  </div>;
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
