@@ -106,20 +106,20 @@ function calcScore(e) {
 function getRating(s) { return s >= 70 ? 'green' : s >= 40 ? 'yellow' : 'red'; }
 
 // ── AI Service ──
-const GKEY = 'AIzaSyD3OrjGWeoxL5sotKd_T5VGk00L-GnPOQ4'; // Set your Gemini API key here or leave blank
-const GURL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+const GKEY = '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'; // Set your Gemini API key here or leave blank
+const GURL = 'const GURL = 'https://api.groq.com/openai/v1/chat/completions';';
 const hasKey = () => !!GKEY;
 
 async function aiChat(prompt, sys='') {
-  if (!GKEY) return {error:true,text:'No API key. Set GKEY in the HTML file.'};
+  if (!GKEY) return {error:true,text:'No API key.'};
   try {
-    const contents = [];
-    if (sys) { contents.push({role:'user',parts:[{text:sys}]}); contents.push({role:'model',parts:[{text:'Understood.'}]}); }
-    contents.push({role:'user',parts:[{text:prompt}]});
-    const res = await fetch(`${GURL}?key=${GKEY}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents,generationConfig:{temperature:0.3,maxOutputTokens:2048}})});
+    const messages = [];
+    if (sys) messages.push({role:'system',content:sys});
+    messages.push({role:'user',content:prompt});
+    const res = await fetch(GURL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+GKEY},body:JSON.stringify({model:'llama-3.3-70b-versatile',messages,temperature:0.3,max_tokens:2048})});
     const data = await res.json();
     if (data.error) return {error:true,text:data.error.message};
-    return {error:false,text:data.candidates?.[0]?.content?.parts?.[0]?.text||'No response'};
+    return {error:false,text:data.choices?.[0]?.message?.content||'No response'};
   } catch(err) { return {error:true,text:err.message}; }
 }
 
